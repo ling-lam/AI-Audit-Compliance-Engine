@@ -1,10 +1,14 @@
 import pandas as pd
 import pdfplumber
 import ollama
+from pathlib import Path
 
-# --- FILE PATHS (Update these to your desktop paths) ---
-excel_path = r'C:\Users\sky\Desktop\Projects\AI-Audit-Compliance-Engine\data\sample.xlsx'
-pdf_path = r'C:\Users\sky\Desktop\Projects\AI-Audit-Compliance-Engine\data\sample.pdf'
+# --- FILE PATHS (Dynamic - relative to script location) ---
+script_dir = Path(__file__).parent
+data_dir = script_dir / 'data'
+
+excel_path = data_dir / 'sample.xlsx'
+pdf_path = data_dir / 'sample.pdf'
 
 def local_ai_audit():
     print("--- 🧠 STEP 1: LOCAL AI ANALYZING POLICY ---")
