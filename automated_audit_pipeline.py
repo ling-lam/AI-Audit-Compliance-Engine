@@ -1,6 +1,8 @@
 import os
 import json
 import re
+import tkinter as tk
+from tkinter import filedialog
 from dotenv import load_dotenv
 
 import pandas as pd
@@ -9,16 +11,33 @@ import ollama
 from pathlib import Path
 from litellm import completion
 
-# Load environment variables
+# --- PATHS ---
 script_dir = Path(os.getcwd())
 env_path = script_dir / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# --- FILE PATHS ---
-data_dir = script_dir / 'data'
+# --- FILE SELECTION WINDOWS ---
+root = tk.Tk()
+root.withdraw()
 
-excel_path = data_dir / 'sample.xlsx'
-pdf_path = data_dir / 'sample.pdf'
+print("📄 Please select your PDF file...")
+pdf_path = Path(filedialog.askopenfilename(
+    title="Select PDF File",
+    filetypes=[("PDF Files", "*.pdf")]
+))
+
+print("📂 Please select your Excel file...")
+excel_path = Path(filedialog.askopenfilename(
+    title="Select Excel File",
+    filetypes=[("Excel Files", "*.xlsx *.xls")]
+))
+
+if not excel_path or str(excel_path) == "." or not pdf_path or str(pdf_path) == ".":
+    raise ValueError("❌ No file selected. Please select both files.")
+
+print(f"✅ Excel: {excel_path}")
+print(f"✅ PDF:   {pdf_path}")
+
 
 # --- LLM FALLBACK FUNCTION ---
 def get_ai_policy_decision(prompt):
