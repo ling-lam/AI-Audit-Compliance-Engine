@@ -11,59 +11,32 @@ import ollama
 from pathlib import Path
 from litellm import completion
 
+
 # --- PATHS ---
 script_dir = Path(os.getcwd())
 env_path = script_dir / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# --- FILE SELECTION WINDOWS ---
-root = tk.Tk()
-root.withdraw()
-
-print("📄 Please select your PDF file...")
-pdf_path = Path(filedialog.askopenfilename(
-    title="Select PDF File",
-    filetypes=[("PDF Files", "*.pdf")]
-))
-
-print("📂 Please select your Excel file...")
-excel_path = Path(filedialog.askopenfilename(
-    title="Select Excel File",
-    filetypes=[("Excel Files", "*.xlsx *.xls")]
-))
-
-if not excel_path or str(excel_path) == "." or not pdf_path or str(pdf_path) == ".":
-    raise ValueError("❌ No file selected. Please select both files.")
-
-print(f"✅ Excel: {excel_path}")
-print(f"✅ PDF:   {pdf_path}")
-
 
 # --- LLM FALLBACK FUNCTION ---
 def get_ai_policy_decision(prompt):
-    # 1️⃣ Try Gemini
     try:
         print("⚡ Trying Gemini...")
-
         response = completion(
             model="gemini/gemini-3-flash-preview",
             messages=[{"role": "user", "content": prompt}],
         )
-
         return response["choices"][0]["message"]["content"]
 
     except Exception as e:
         print(f"❌ Gemini failed: {e}")
 
-    # 2️⃣ Fallback to Ollama
     try:
         print("🧠 Falling back to Ollama...")
-
         response = ollama.chat(
             model="llama3:latest",
             messages=[{"role": "user", "content": prompt}],
         )
-
         return response.message.content
 
     except Exception as e:
@@ -73,9 +46,6 @@ def get_ai_policy_decision(prompt):
 
 # --- JSON EXTRACTION ---
 def extract_json(text):
-    """
-    Extract JSON object from messy LLM response
-    """
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         return match.group(0)
@@ -102,11 +72,42 @@ def safe_get_rules(prompt):
     raise ValueError("Failed to get valid JSON from AI")
 
 
-# --- MAIN FUNCTION ---
-def local_ai_audit():
+# --- FILE SELECTION ---
+def select_files():
+    root = tk.Tk()
+    root.attributes('-topmost', True)
+    root.focus_force()
+    root.withdraw()
+
+    print("📄 Please select your PDF file...")
+    pdf_path = Path(filedialog.askopenfilename(
+        title="Select PDF File",
+        filetypes=[("PDF Files", "*.pdf")],
+        parent=root
+    ))
+
+    print("📂 Please select your Excel file...")
+    excel_path = Path(filedialog.askopenfilename(
+        title="Select Excel File",
+        filetypes=[("Excel Files", "*.xlsx *.xls")],
+        parent=root
+    ))
+
+    root.destroy()
+
+    if not pdf_path or str(pdf_path) == "." or not excel_path or str(excel_path) == ".":
+        raise ValueError("❌ No file selected. Please select both files.")
+
+    print(f"✅ PDF:   {pdf_path}")
+    print(f"✅ Excel: {excel_path}")
+
+    return pdf_path, excel_path
+
+
+# --- MAIN AUDIT FUNCTION ---
+def local_ai_audit(pdf_path, excel_path):
     print("--- 🧠 STEP 1: AI ANALYZING POLICY ---")
 
-    # 1. Read PDF
     try:
         with pdfplumber.open(pdf_path) as pdf:
             policy_text = pdf.pages[0].extract_text()
@@ -114,7 +115,6 @@ def local_ai_audit():
         print(f"❌ Could not read PDF: {e}")
         return
 
-    # 2. Prompt (strict JSON request)
     prompt = f"""
     Analyze this banking policy: '{policy_text[:1500]}'
 
@@ -137,7 +137,6 @@ def local_ai_audit():
 
     print("Requesting interpretation from LLM chain...")
 
-    # 3. Get structured rules
     try:
         rules = safe_get_rules(prompt)
     except Exception as e:
@@ -146,7 +145,6 @@ def local_ai_audit():
 
     print(f"✅ Parsed Rules: {rules}")
 
-    # --- STEP 2: AUDIT EXCEL ---
     print("\n--- 📊 STEP 2: RUNNING CROSS-DOCUMENT AUDIT ---")
 
     df = pd.read_excel(excel_path)
@@ -167,22 +165,24 @@ def local_ai_audit():
 
     df['Audit_Result'] = df.apply(check_compliance, axis=1)
 
-    # --- STEP 3: REPORT ---
     print("\n--- 🚨 AUDIT EXCEPTIONS FOUND ---")
 
     exceptions = df[df['Audit_Result'] != "Compliant"]
 
     if not exceptions.empty:
         print(exceptions[['Customer_Name', 'Audit_Result']])
-
         output_path = script_dir / "Audit_Exceptions_Report.xlsx"
         exceptions.to_excel(output_path, index=False)
-
         print(f"\n✅ Exceptions saved to '{output_path}'")
     else:
         print("🎉 No exceptions found. All accounts meet the AI-interpreted policy.")
 
 
-# --- RUN SCRIPT ---
+# --- ENTRY POINT ---
+def main():
+    pdf_path, excel_path = select_files()
+    local_ai_audit(pdf_path, excel_path)
+
+
 if __name__ == "__main__":
-    local_ai_audit()
+    main()
